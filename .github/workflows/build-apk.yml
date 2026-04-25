@@ -8,33 +8,111 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 🔽 Baixa o repo
       - uses: actions/checkout@v4
 
+      # 🔽 Node
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      # 🔽 Java
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      - run: npm install
+      # 🔽 Dependências
+      - name: Instalar dependências
+        run: npm install
 
-      - run: npx cap init "VitalCare MedControl" com.vitalcare.medcontrol --web-dir=www
-      - run: npx cap add android
+      # 🔽 Capacitor
+      - name: Inicializar Capacitor
+        run: npx cap init "VitalCare MedControl" com.vitalcare.medcontrol --web-dir=www
 
-      # 🔥 instala ferramentas
+      - name: Criar Android
+        run: npx cap add android
+
+      # 🔥 Instala ImageMagick (processar imagens)
       - name: Instalar ferramentas de imagem
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      # 🧠 CONVERSÃO FORÇADA (resolve teu erro)
-      - name: Normalizar imagens (qualquer formato → PNG válido)
+      # 🧠 NORMALIZA QUALQUER IMAGEM (resolve teu erro)
+      - name: Corrigir imagens automaticamente
         run: |
           mkdir -p tmp
 
-          convert native/assets/icon.png tmp/icon_fixed.png || true
-          convert native/assets/splash.png tmp/splash_fixed.png || true
+          # tenta converter qualquer coisa para PNG válido
+          convert native/assets/icon.png tmp/icon_fixed.png || cp native/assets/icon.png tmp/icon_fixed.png
+          convert native/assets/splash.png tmp/splash_fixed.png || cp native/assets/splash.png tmp/splash_fixed.png
+
+          mv tmp/icon_fixed.png native/assets/icon.png
+          mv tmp/splash_fixed.png native/assets/splash.png
+
+      # 🔍 Diagnóstico (opcional mas útil)
+      - name: Validar imagens
+        run: |
+          file native/assets/icon.png
+          file native/assets/splash.png
+
+      # 🔷 ÍCONES
+      - name: Gerar ícones
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+
+          convert native/assets/icon.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      # 🟢 SPLASH
+      - name: Gerar splash
+        run: |
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/drawable-land
+
+          convert native/assets/splash.png -resize 1080x1080 android/app/src/main/res/drawable/splash.png
+          convert native/assets/splash.png -resize 1920x1080 android/app/src/main/res/drawable-land/splash.png
+
+      # 🎨 TEMA COM SPLASH
+      - name: Configurar styles.xml
+        run: |
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:windowBackground">@drawable/splash</item>
+              </style>
+
+              <style name="AppTheme.NoActionBarLaunch" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">@drawable/splash</item>
+                  <item name="android:windowFullscreen">true</item>
+              </style>
+
+          </resources>
+          EOF
+
+      # 🔄 Sincroniza
+      - run: npx cap sync android
+
+      # 🔧 Permissão gradle
+      - run: chmod +x android/gradlew
+
+      # 🚀 Build APK
+      - run: cd android && ./gradlew assembleDebug
+
+      # 📦 Exporta APK
+      - uses: actions/upload-artifact@v4
+        with:
+          name: APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk          convert native/assets/splash.png tmp/splash_fixed.png || true
 
           mv tmp/icon_fixed.png native/assets/icon.png
           mv tmp/splash_fixed.png native/assets/splash.png
