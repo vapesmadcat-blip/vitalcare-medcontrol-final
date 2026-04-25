@@ -26,16 +26,12 @@ jobs:
         run: |
           if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
             npx cap init "VitalCare MedControl" com.vitalcare.medcontrol --web-dir=www
-          else
-            echo "Capacitor já existe"
           fi
 
       - name: Criar Android
         run: |
           if [ ! -d android ]; then
             npx cap add android
-          else
-            echo "Android já existe"
           fi
 
       - name: Configurar Java
@@ -43,14 +39,12 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: 'none'
 
-      - name: Instalar ferramentas de imagem
+      - name: Instalar ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      - name: Corrigir imagens automaticamente
+      - name: Corrigir imagens
         run: |
-          mkdir -p native/assets
           mkdir -p tmp
 
           if [ ! -f native/assets/icon.png ]; then
@@ -63,16 +57,11 @@ jobs:
             exit 1
           fi
 
-          convert native/assets/icon.png -alpha on -background none -resize 1024x1024 tmp/icon_fixed.png
-          convert native/assets/splash.png -alpha on -background none -resize 1080x1080 tmp/splash_fixed.png
+          convert native/assets/icon.png -resize 1024x1024 tmp/icon.png
+          convert native/assets/splash.png -resize 1080x1080 tmp/splash.png
 
-          mv tmp/icon_fixed.png native/assets/icon.png
-          mv tmp/splash_fixed.png native/assets/splash.png
-
-      - name: Validar imagens
-        run: |
-          file native/assets/icon.png
-          file native/assets/splash.png
+          mv tmp/icon.png native/assets/icon.png
+          mv tmp/splash.png native/assets/splash.png
 
       - name: Gerar ícones
         run: |
@@ -123,10 +112,10 @@ jobs:
       - name: Sincronizar Capacitor
         run: npx cap sync android
 
-      - name: Dar permissão ao Gradle
+      - name: Permissão Gradle
         run: chmod +x android/gradlew
 
-      - name: Gerar APK Debug
+      - name: Build APK
         run: cd android && ./gradlew assembleDebug
 
       - name: Exportar APK
