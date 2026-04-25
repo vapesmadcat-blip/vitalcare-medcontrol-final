@@ -8,33 +8,132 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 🔽 Baixa o repo
-      - uses: actions/checkout@v4
+      - name: Baixar repositório
+        uses: actions/checkout@v4
 
-      # 🔽 Node
-      - uses: actions/setup-node@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # 🔽 Java
-      - uses: actions/setup-java@v4
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Instalar Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Inicializar Capacitor
+        run: |
+          if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
+            npx cap init "VitalCare MedControl" com.vitalcare.medcontrol --web-dir=www
+          else
+            echo "Capacitor já existe"
+          fi
+
+      - name: Criar Android
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          else
+            echo "Android já existe"
+          fi
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: 'none'
 
-      # 🔽 Dependências
-      - name: Instalar dependências
-        run: npm install
+      - name: Instalar ferramentas de imagem
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      # 🔽 Capacitor
-      - name: Inicializar Capacitor
-        run: npx cap init "VitalCare MedControl" com.vitalcare.medcontrol --web-dir=www
+      - name: Corrigir imagens automaticamente
+        run: |
+          mkdir -p native/assets
+          mkdir -p tmp
 
-      - name: Criar Android
-        run: npx cap add android
+          if [ ! -f native/assets/icon.png ]; then
+            echo "ERRO: native/assets/icon.png não encontrado"
+            exit 1
+          fi
 
-      # 🔥 Instala ImageMagick (processar imagens)
+          if [ ! -f native/assets/splash.png ]; then
+            echo "ERRO: native/assets/splash.png não encontrado"
+            exit 1
+          fi
+
+          convert native/assets/icon.png -alpha on -background none -resize 1024x1024 tmp/icon_fixed.png
+          convert native/assets/splash.png -alpha on -background none -resize 1080x1080 tmp/splash_fixed.png
+
+          mv tmp/icon_fixed.png native/assets/icon.png
+          mv tmp/splash_fixed.png native/assets/splash.png
+
+      - name: Validar imagens
+        run: |
+          file native/assets/icon.png
+          file native/assets/splash.png
+
+      - name: Gerar ícones
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+
+          convert native/assets/icon.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert native/assets/icon.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      - name: Gerar splash
+        run: |
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/drawable-land
+
+          convert native/assets/splash.png -resize 1080x1080 android/app/src/main/res/drawable/splash.png
+          convert native/assets/splash.png -resize 1920x1080 android/app/src/main/res/drawable-land/splash.png
+
+      - name: Configurar styles.xml
+        run: |
+          mkdir -p android/app/src/main/res/values
+
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:windowBackground">@drawable/splash</item>
+                  <item name="android:windowNoTitle">true</item>
+                  <item name="android:windowActionBar">false</item>
+              </style>
+
+              <style name="AppTheme.NoActionBarLaunch" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:windowBackground">@drawable/splash</item>
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:windowNoTitle">true</item>
+                  <item name="android:windowActionBar">false</item>
+              </style>
+
+          </resources>
+          EOF
+
+      - name: Sincronizar Capacitor
+        run: npx cap sync android
+
+      - name: Dar permissão ao Gradle
+        run: chmod +x android/gradlew
+
+      - name: Gerar APK Debug
+        run: cd android && ./gradlew assembleDebug
+
+      - name: Exportar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VitalCare-MedControl-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk      # 🔥 Instala ImageMagick (processar imagens)
       - name: Instalar ferramentas de imagem
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
