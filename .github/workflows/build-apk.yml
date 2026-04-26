@@ -42,6 +42,7 @@ jobs:
         run: |
           mkdir -p tmp
 
+
           # tenta converter qualquer coisa para PNG válido
           convert native/assets/icon.png tmp/icon_fixed.png || cp native/assets/icon.png tmp/icon_fixed.png
           convert native/assets/splash.png tmp/splash_fixed.png || cp native/assets/splash.png tmp/splash_fixed.png
